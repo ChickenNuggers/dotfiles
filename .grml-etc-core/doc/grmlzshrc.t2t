@@ -1,0 +1,1258 @@
+GRMLZSHRC
+
+September, 2014
+
+%!target: man
+%!postproc(man): "^(\.TH.*) 1 "  "\1 5 "
+
+
+= NAME =
+grmlzshrc - Grml's zsh setup
+
+
+= SYNOPSIS =
+//zsh// [**options**]...
+
+
+= DESCRIPTION =
+The Grml project provides a fairly exhaustive interactive setup (referred to
+as //grmlzshrc// throughout this document) for the amazing unix shell zsh
+(http://zsh.sourceforge.net). This is the reference manual for that
+setup.
+
+To use //grmlzshrc//, you need at least version 3.1.7 of zsh (although not all
+features are enabled in every version).
+
+//grmlzshrc// behaves differently depending on which user loads it. For the
+root user (**EUID** == 0) only a subset of features is loaded by default. This
+behaviour can be altered by setting the **GRML_ALWAYS_LOAD_ALL** STARTUP
+VARIABLE (see below).
+
+Users may want to keep an up-to-date version of the setup (possibly from the
+git-sources) in //~/.zshrc//. If that happens on a system where the global
+zshrc is also a //grmlzshrc// (but possibly an older one), you can inhibit
+loading the global version by doing:
+\
+```
+echo setopt no_global_rcs >> ~/.zshenv
+```
+
+Note, that this will disable //ANY// global files, except for the global
+zshenv file.
+
+= STARTUP VARIABLES =
+Some of the behaviour of //grmlzshrc// can be altered by setting certain shell
+variables. These may be set temporarily when starting zsh like this:
+\
+``` % GRML_DISPLAY_BATTERY=1 zsh
+
+Or by setting them permanently in **zshrc.pre** (See AUXILIARY FILES below).
+
+: **BATTERY**
+Deprecated. Use **GRML_DISPLAY_BATTERY** instead.
+
+: **COMMAND_NOT_FOUND**
+A non zero value activates a handler, which is called when a command can not
+be found. The handler is defined by GRML_ZSH_CNF_HANDLER (see below).
+
+: **GRML_COMP_CACHING**
+If set to //yes// (the default), the setup will enable zsh's completion caching
+mechanism, with the caching data being placed into //$GRML_COMP_CACHE_DIR//.
+
+: **GRML_COMP_CACHE_DIR**
+This defines where zsh's completion caching data will be placed, if
+//$GRML_COMP_CACHING// is active. The default is //${ZDOTDIR:-$HOME}/.cache//.
+The setup will ensure the directory exists before attempting to use it.
+
+: **GRML_DISPLAY_BATTERY**
+If set to a value greater than zero, //grmlzshrc// will put the battery status
+into the right hand side interactive prompt. Supported OSes are //GNU/Linux//,
+//FreeBSD//, //OpenBSD// and //Darwin//.
+
+: **GRML_ZSH_CNF_HANDLER**
+This variable contains the handler to be used by COMMAND_NOT_FOUND (see above)
+and defaults to "/usr/share/command-not-found/command-not-found".
+
+: **GRMLSMALL_SPECIFIC**
+Set this to zero to remove items in zsh config, which do not work in
+grml-small.
+
+: **HISTFILE**
+Where zsh saves the history. Default: ${HOME}/.zsh_history.
+
+: **HISTSIZE**
+Number of commands to be kept in the history. On a Grml-CD this defaults to
+500, on a hard disk installation to 5000.
+
+: **MAILCHECK**
+Sets the frequency in seconds for zsh to check for new mail. Defaults to 30.
+A value of zero turns off checking.
+
+: **NOCOR**
+Non zero values deactivate automatic correction of commands.
+
+: **NOMENU**
+If set to zero (default), allows selection from a menu, if there are at least
+five possible options of completion.
+
+: **NOPRECMD**
+A non zero value disables precmd and preexec commands. These are functions
+that are run before every command (setting xterm/screen titles etc.).
+
+: **REPORTTIME**
+Show time (user, system and cpu) used by external commands, if they run longer
+than the defined number of seconds (default: 5).
+
+: **SAVEHIST**
+Number of commands to be stored in ${HISTFILE}. Defaults to 1000 on a Grml-CD
+and to 10000 on an installation on hard disk.
+
+: **watch**
+As in tcsh(1) an array of login/logout events to be reported by the shell
+builtin "log". For details see zshparam(1). Defaults to (notme root).
+
+: **ZSH_NO_DEFAULT_LOCALE**
+Import "/etc/default/locale", if set to zero (default).
+
+: **ZSH_PROFILE_RC**
+A non zero value causes shell functions to be profiled. The results can be
+obtained with the zprof builtin command (see zshmodules(1) for details).
+
+: **COMPDUMPFILE**
+Specifies the location of the completion dump file. Default: $HOME/.zcompdump.
+
+
+= FEATURE DESCRIPTION =
+This is an in depth description of non-standard features implemented by
+//grmlzshrc//.
+
+== DIRSTACK HANDLING ==
+The dirstack in //grmlzshrc// has a persistent nature. It is stored into a
+file each time zsh's working directory is changed. That file can be configured
+via the **DIRSTACKFILE** variable and it defaults to **~/.zdirs**. The
+**DIRSTACKSIZE** variable defaults to **20** in this setup.
+
+The **DIRSTACKFILE** is loaded each time zsh starts, therefore freshly started
+zshs inherit the dirstack of the zsh that most recently updated
+**DIRSTACKFILE**.
+
+It is possible to apply a filter to the names of directories that will be
+committed to the persistent dirstack file. There are two ways to configure this
+filter: A general function based filter and a pattern based filter. Both are
+setup via styles in the **':grml:chpwd:dirstack'** context.
+
+To use a function based filter set the //filter// style for that context to the
+name of a function to call every time a directory name is to be added to the
+persistent dirstack. If the function's return value signals success (ie. return
+value "0"), the directory name is filtered out and **not** added to the
+persistent stack. Example:
+\
+```
+function my_dirstack_filter() { [[ $1 == /tmp(|/*) ]] }
+zstyle ':grml:chpwd:dirstack' filter my_dirstack_filter
+```
+
+The pattern based filter uses a list of patterns passed to the //exclude//
+style in the aforementioned context. Each pattern is tested and the first that
+matches will keep the directory name from being added to the persistent stack.
+If none of the patterns matches, the name is added. example:
+\
+```
+zstyle ':grml:chpwd:dirstack' exclude "/tmp(|/*)" "$HOME/tmp(|/*)"
+```
+
+The function based filter is more general, the pattern based filter easier to
+set up. If both filter variants are used at the same time, the function based
+filter will be executed //before// the pattern based one.
+
+If you would like to apply your filters while //loading// the persistent
+dirstack file, set the //filter-on-load// boolean style (the default is
+//false//):
+\
+```
+zstyle ':grml:chpwd:dirstack' filter-on-load true
+```
+
+Setting the //filter-on-load// needs to be done in ".zshrc.pre" because the
+style needs to be set when the main setup is executing! The other styles do not
+have this limitation, but the initial filtering will obviously be done using
+the filters that are configured **at** **that** **point**. The rule of thumb
+is: If you want to filter on load, setup everything in ".zshrc.pre" otherwise
+".zshrc.local" works just as well.
+
+
+== DIRECTORY BASED PROFILES ==
+
+If you need to perform certain actions each time you enter certain
+directory-trees, this is the feature you are looking for.
+
+
+=== Initialisation ===
+To initialise the system, you need to call the function `chpwd_profiles' at
+some point in your `zshrc.local'; preferably **after** you configured the
+system. The configuration of the system is described further below.
+
+If you need to do initialisations the first time `chpwd_profiles' is called
+(which should be in your configuration file), you can do that in a function
+called "chpwd_profiles_init". That function needs to be defined **before**
+`chpwd_profiles' is called for this to work.
+
+During the **first** call of `chpwd_profiles' (and therefore all its profile
+functions) the parameter `$CHPWD_PROFILES_INIT' exists and is set to `1'. In
+all other cases, the parameter does not exist at all.
+
+
+=== Styles and Profile-names ===
+To store its configuration, the system uses **functions** and **styles**
+(zsh's context sensitive configuration system), such as this:
+
+\
+```
+zstyle ':chpwd:profiles:/usr/src/grml(|/|/*)'   profile grml
+zstyle ':chpwd:profiles:/usr/src/debian(|/|/*)' profile debian
+```
+
+When that's done and you enter a directory that matches the pattern in the
+third part of the context, a function called chpwd_profile_grml, for example,
+is called (if it exists).
+
+If no pattern matches (read: no profile is detected) the profile is set to
+'default', which means chpwd_profile_default is attempted to be called.
+
+A word about the context (the ':chpwd:profiles:*' stuff in the zstyle command)
+which is used: The third part in the context is matched against ${PWD}. That's
+why using a pattern such as /foo/bar(|/|/*) makes sense. Because that way the
+profile is detected for all these values of ${PWD}:
+\
+```
+  /foo/bar
+  /foo/bar/
+  /foo/bar/baz
+```
+So, if you want to make double damn sure a profile works in /foo/bar and
+everywhere deeper in that tree, just use (|/|/*) and be happy.
+
+The name of the detected profile will be available in a variable called
+'profile' in your functions. You don't need to do anything, it'll just be
+there.
+
+
+=== Controlling Profile Execution ===
+
+During its initialisation run, the system creates a parameter $CHPWD_PROFILE,
+which is set to the profile that was is currently active (the default value is
+"default"). That way you can avoid running code for a profile that is already
+active, by running code such as the following at the start of your function:
+\
+```
+function chpwd_profile_grml() {
+    [[ ${profile} == ${CHPWD_PROFILE} ]] && return 1
+  ...
+}
+```
+
+If you know you are going to do that all the time for each and every
+directory-profile function you are ever going to write, you may also set the
+`re-execute' style to `false' (which only defaults to `true' for backwards
+compatibility), like this:
+\
+```
+  zstyle ':chpwd:profiles:*' re-execute false
+```
+
+
+=== Signaling availabily/profile changes ===
+
+If you use this feature and need to know whether it is active in your current
+shell, there are several ways to do that. Here are two simple ways:
+
+a) If knowing if the profiles feature is active when zsh starts is good
+enough for you, you can use the following snippet:
+
+(( ${+functions[chpwd_profiles]} )) && print "directory profiles active"
+
+b) If that is not good enough, and you would prefer to be notified whenever a
+profile changes, you can solve that by making sure you start **every**
+profile function you create like this:
+
+function chpwd_profile_myprofilename() {
+    [[ ${profile} == ${CHPWD_PROFILE} ]] && return 1
+    print "chpwd(): Switching to profile: $profile"
+  ...
+}
+
+That makes sure you only get notified if a profile is **changed**, not
+everytime you change directory. (To avoid this, you may also set the newer
+`re-execute' style like described further above instead of the test on top of
+the function.
+
+
+=== Leaving Profiles ===
+
+When the system switches from one profile to another, it executes a function
+named "chpwd_leave_profile_<PREVIOUS-PROFILE-NAME>()" before calling the
+profile-function for the new profile.
+
+
+=== Version requirement ===
+This feature requires zsh //4.3.3// or newer.
+
+
+== ACCEPTLINE WRAPPER ==
+The //accept-line// wiget is the one that is taking action when the **return**
+key is hit. //grmlzshrc// uses a wrapper around that widget, which adds new
+functionality.
+
+This wrapper is configured via styles. That means, you issue commands, that look
+like:
+\
+```
+zstyle 'context' style value
+```
+
+The context namespace, that we are using is 'acceptline'. That means, the actual
+context for your commands look like: **':acceptline:<subcontext>'**.
+
+Where **<subcontext>** is one of: **default**, **normal**, **force**, **misc**
+or **empty**.
+
+
+=== Recognized Contexts ===
+: **default**
+This is the value, the context is initialized with.
+The //compwarnfmt and //rehash// styles are looked up in this context.
+
+: **normal**
+If the first word in the command line is either a command, alias, function,
+builtin or reserved word, you are in this context.
+
+: **force**
+This is the context, that is used if you hit enter again, after being warned
+about the existence of a _completion for the non-existing command you
+entered.
+
+: **empty**
+This is the context, you are in if the command line is empty or only
+consists of whitespace.
+
+: **misc**
+This context is in effect, if you entered something that does not match any
+of the above. (e.g.: variable assignments).
+
+
+=== Available Styles ===
+: **nocompwarn**
+If you set this style to true, the warning about non existent commands,
+for which completions exist will not be issued. (Default: **false**)
+
+: **compwarnfmt**
+The message, that is displayed to warn about the _completion issue.
+(default: **'%c will not execute and completion %f exists.'**)
+'%c' is replaced by the command name, '%f' by the completion's name.
+
+: **rehash**
+If this is set, we'll force rehashing, if appropriate. (Defaults to
+**true** in //grmlzshrc//).
+
+: **actions**
+This can be a list of wigdets to call in a given context. If you need a
+specific order for these to be called, name them accordingly. The default value
+is an **empty list**.
+
+: **default_action**
+The name of a widget, that is called after the widgets from 'actions'.
+By default, this will be '.accept-line' (which is the built-in accept-line
+widget).
+
+: **call_default**
+If true in the current context, call the widget in the 'default_action'
+style. (The default is **true** in all contexts.)
+
+
+== PROMPT ==
+
+The //grmlzshrc// now supplies three prompt themes compatible with zsh's
+**promptinit** system. The three themes are called **grml**, **grml-large** and
+**grml-chroot**.
+
+By default, **grml** is used, unless //$GRMLPROMPT// is set to a value larger
+than zero, in which case **grml-large** is used. Lastly, if //$GRML_CHROOT// is
+non-empty, **grml-chroot** is used.
+
+As usual, with promtinit themes, the user may switch to a different theme using
+the //prompt// utility:
+\
+```
+    prompt grml-large
+```
+
+That will use the **grml-large** prompt theme.
+
+The themes are highly customisable. The main source of documentation about
+customisation is the main **grml** theme's doc-string, that is available via
+the following command:
+\
+```
+    prompt -h grml
+```
+
+The other themes also come with doc-strings, but the main theme's is the
+canonical reference about all of them.
+
+This feature requires version //4.3.7// of the shell. Older versions will use
+the classic grml prompt as a fallback.
+
+A note to people who like customisation: If you are **not** using a prompt
+theme for your customisation, but you're either statically setting $PS1 (or
+$PROMPT) or you're constructing one of those variables in zsh's \`precmd()'
+function, make sure you are turning the zsh's prompt theme system **off**
+before doing so. A correct example customisation could look like this:
+\
+```
+    # Turn the prompt system off:
+    prompt off
+    # Customise the prompt yourself:
+    PS1='%~ %# '
+```
+
+You also add your own tokens by using the \`grml_theme_add_token()' function.
+Call the function without arguments for detailed documentation about that
+procedure.
+
+== GNU/SCREEN STATUS SETTING ==
+//grmlzshrc// sets screen's hardstatus lines to the currently running command
+or **'zsh'** if the shell is idling at its prompt. If the current working
+directory is inside a repository unter version control, screen status is set
+to: **'zsh: <repository name>'** via zsh's vcs_info.
+
+
+== PERSISTENT HISTORY ==
+If you got commands you consider important enough to be included in every
+shell's history, you can put them into ~/.important_commands and they will be
+available via the usual history lookup widgets.
+
+
+= REFERENCE =
+== ENVIRONMENT VARIABLES ==
+//grmlzshrc// sets some environment variables, which influence the
+behaviour of applications.
+
+: **COLORTERM**
+Set to "yes". Some applications read this to learn about properties
+of the terminal they are running in.
+
+: **EDITOR**
+If not already set, sets the default editor. Falls back to vi(1),
+if vim(1) is not available.
+
+: **LESS_TERMCAP_***
+Some environment variables that add colour support to less(1) for viewing
+man pages. See termcap(5) for details.
+
+: **MAIL**
+The mailbox file for the current user is set to /var/mail/$USER, if not
+already set otherwise.
+
+: **PAGER**
+Set less(1) as default pager, if not already set to something different.
+
+
+== OPTIONS ==
+Apart from zsh's default options, //grmlzshrc// sets some options
+that change the behaviour of zsh. Options that change Z-shell's default
+settings are marked by <grml>. But note, that zsh's defaults vary depending
+on its emulation mode (csh, ksh, sh, or zsh). For details, see zshoptions(1).
+
+: **append_history**
+Zsh sessions, that use //grmlzshrc//, will append their history list to the
+history file, rather than replace it. Thus, multiple parallel zsh sessions
+will all have the new entries from their history lists added to the history
+file, in the order that they exit. The file will still be periodically
+re-written to trim it when the number of lines grows 20% beyond the value
+specified by $SAVEHIST.
+
+: **auto_cd** <grml>
+If a command is issued that can't be executed as a normal command, and the
+command is the name of a directory, perform the cd command to that directory.
+
+: **auto_pushd** <grml>
+Make cd push the old directory onto the directory stack.
+
+: **completeinword** <grml>
+If the cursor is inside a word, completion is done from both ends;
+instead of moving the cursor to the end of the word first and starting
+from there.
+
+: **extended_glob** <grml>
+Treat the '#', '~' and '^' characters as active globbing pattern characters.
+
+: **extended_history** <grml>
+Save each command's beginning timestamp (in seconds since the epoch) and the
+duration (in seconds) to the history file.
+
+: **hash_list_all**
+Whenever a command completion is attempted, make sure the entire command
+path is hashed first. This makes the first completion slower.
+
+: **histignorealldups** <grml>
+If a new command line being added to the history list duplicates an
+older one, the older command is removed from the list, even if it is
+not the previous event.
+
+: **histignorespace** <grml>
+Remove command lines from the history list when the first character on
+the line is a space, or when one of the expanded aliases contains a
+leading space. Note that the command lingers in the internal history
+until the next command is entered before it vanishes.
+
+: **longlistjobs** <grml>
+List jobs in long format by default.
+
+: **nobeep** <grml>
+Avoid to beep on errors in zsh command line editing (zle).
+
+: **noglobdots**
+A wildcard character never matches a leading '.'.
+
+: **nohup** <grml>
+Do not send the hangup signal (HUP:1) to running jobs when the shell exits.
+
+: **nonomatch** <grml>
+If a pattern for filename generation has no matches, do not print an error
+and leave it unchanged in the argument list. This also applies to file
+expansion of an initial `~' or `='.
+
+: **notify**
+Report the status of background jobs immediately, rather than waiting until
+just before printing a prompt.
+
+: **pushd_ignore_dups** <grml>
+Don't push multiple copies of the same directory onto the directory stack.
+
+: **share_history** <grml>
+As each line is added to the history file, it is checked to see if anything
+else was written out by another shell, and if so it is included in the
+history of the current shell too. Using !-style history, the commands from
+the other sessions will not appear in the history list unless you explicitly
+type the "history" command. This option is activated for zsh versions >= 4,
+only.
+
+
+== KEYBINDINGS ==
+Apart from zsh's default key bindings, //grmlzshrc// comes with its own set of
+key bindings. Note that bindings like **ESC-e** can also be typed as **ALT-e**
+on PC keyboards.
+
+: **ESC-e**
+Edit the current command buffer in your favourite editor.
+
+: **ESC-v**
+Deletes a word left of the cursor; seeing '/' as additional word separator.
+
+: **CTRL-x-1**
+Jump right after the first word.
+
+: **CTRL-x-M()**
+Create directory under cursor or the selected area.
+To select an area press ctrl-@ and use the cursor.
+Use case: you type "mv abc ~/testa/testb/testc/" and remember that the
+directory does not exist yet -> press **CTRL-xM** and problem solved.
+
+: **CTRL-x-p**
+Searches the last occurence of string before the cursor in the command history.
+
+: **CTRL-x-z**
+Display help on keybindings and zsh line editor. Press consecutively to page through content.
+
+: **CTRL-z**
+Brings a job, which got suspended with CTRL-z back to foreground.
+
+
+=== Customisation ===
+
+To customise keybindings, you can just use zsh's bindkey utility. However, if
+you plan to to use the `//zle-line-init//' or `//zle-line-finish//' hooks
+yourself, make sure you call the following functions in the respective hook:
+
+- **zle-line-init**: //zle-smkx//
+- **zle-line-finish**: //zle-rmkx//
+
+
+This is **required** so the keybindings set up by //grmlzshrc// work. The
+reason for this is to turn the terminal into the right mode while zsh's line
+editor (zle) is running. This enables us to query //terminfo// about escape
+sequences for special keys and thus simplify and generalise our keybinding
+section.
+
+
+== SHELL FUNCTIONS ==
+//grmlzshrc// comes with a wide array of defined shell functions to ease the
+user's life.
+
+: **855resolution()**
+If 915resolution is available, issues a warning to the user to run it instead
+to modify the resolution on intel graphics chipsets.
+
+: **accessed()**
+Lists files in current directory, which have been accessed within the
+last N days. N is an integer to be passed as first and only argument.
+If no argument is specified N is set to 1.
+
+: **any()**
+Lists processes matching given pattern.
+
+: **asc()**
+Login on the host provided as argument using autossh. Then reattach a GNU screen
+session if a detached session is around or detach a currently attached screen or
+else start a new screen.  This is especially useful for roadwarriors using GNU
+screen and ssh.
+
+: **bk()**
+Simple backup management of a file or directory using standard unix programs.
+The target file name is the original name plus a time stamp attached. Symlinks
+and file attributes like mode, ownership and timestamps are preserved.
+
+: **cdrecord()**
+If the original cdrecord is not installed, issues a warning to the user to
+use the wodim binary instead. Wodim is the debian fork of Joerg Schillings
+cdrecord.
+
+: **cdt()**
+Creates a temporary directory using mktemp. Then changes current
+working directory to it.
+
+: **changed()**
+Lists files in current directory, which have been changed within the
+last N days. N is an integer to be passed as first and only argument.
+If no argument is specified N is set to 1.
+
+: **check_com()**
+Returns true if given command exists either as program, function, alias,
+builtin or reserved word. If the option -c is given, only returns true,
+if command is a program.
+
+: **checkhome()**
+Changes directory to $HOME on first invocation of zsh. This is necessary on
+Grml systems with autologin.
+
+: **cl()**
+Changes current directory to the one supplied by argument and lists the files
+in it, including file names starting with ".".
+
+: **dchange()**
+Shows the changelog of given package in $PAGER.
+
+: **dcopyright()**
+Shows the copyright of given package in $PAGER.
+
+: **debian2hd()**
+Tells the user to use grml-debootstrap, if she wants to install debian to
+harddisk.
+
+: **deswap()**
+A trick from $LINUX-KERNELSOURCE/Documentation/power/swsusp.txt. It brings
+back interactive responsiveness after suspend, when the system is swapping
+heavily.
+
+: **dnews()**
+Shows the NEWS file for the given package in $PAGER.
+
+: **edalias()**
+Edit given alias.
+
+: **edfunc()**
+Edit given shell function.
+
+: **freload()**
+Reloads an autoloadable shell function (See autoload in zshbuiltins(1)).
+
+: **grml_vcs_info_toggle_colour()**
+Toggles between coloured and uncoloured formats in vcs_info configuration.
+This is useful with prompts that break if colour codes are in vcs_info
+format expansions (like the `clint' prompt and every other prompt that
+uses %v to expand the contents of `$vcs_into_msg_0_'). If you are using
+customised vcs_info formats, you shouldn't be using this function, since
+it will set all formats to grml's default values (either coloured or plain)
+again.
+
+: **hgdi()**
+Use GNU diff with options -ubwd for mercurial.
+
+: **hgstat()**
+Displays diffstat between the revision given as argument and tip (no
+argument means last revision).
+
+: **hidiff()**
+Outputs highlighted diff; needs highstring(1).
+
+: **is4()**
+Returns true, if zsh version is equal or greater than 4, else false.
+
+: **is41()**
+Returns true, if zsh version is equal or greater than 4.1, else false.
+
+: **is42()**
+Returns true, if zsh version is equal or greater than 4.2, else false.
+
+: **is425()**
+Returns true, if zsh version is equal or greater than 4.2.5, else false.
+
+: **is43()**
+Returns true, if zsh version is equal or greater than 4.3, else false.
+
+: **is433()**
+Returns true, if zsh version is equal or greater than 4.3.3, else false.
+
+: **isdarwin()**
+Returns true, if running on darwin, else false.
+
+: **isfreebsd()**
+Returns true, if running on FreeBSD, else false.
+
+: **isgrml()**
+Returns true, if running on a grml system, else false.
+
+: **isgrmlcd()**
+Returns true, if running on a grml system from a live cd, else false.
+
+: **isgrmlsmall()**
+Returns true, if run on grml-small, else false.
+
+: **islinux()**
+Returns true, if running on Linux, else false.
+
+: **iso2utf()**
+Changes every occurrence of the string iso885915 or ISO885915 in
+environment variables to UTF-8.
+
+: **isopenbsd()**
+Returns true, if running on OpenBSD, else false.
+
+: **isutfenv()**
+Returns true, if run within an utf environment, else false.
+
+: **mkcd()**
+Creates directory including parent directories, if necessary. Then changes
+current working directory to it.
+
+: **modified()**
+Lists files in current directory, which have been modified within the
+last N days. N is an integer to be passed as first and only argument.
+If no argument is specified N is set to 1.
+
+: **nt()**
+A helper function for the "e" glob qualifier to list all files newer
+than a reference file.
+\
+Example usages:
+```
+% NTREF=/reference/file
+% ls -l *(e:nt:)
+% # Inline:
+% ls -l *(e:'nt /reference/file':)
+```
+
+: **profile()**
+Runs a command in zsh with profiling enabled (See startup variable
+ZSH_PROFILE_RC above).
+
+: **salias()**
+Creates an alias whith sudo prepended, if $EUID is not zero. Run "salias -h"
+for details. See also xunfunction() below.
+
+: **simple-extract()**
+Tries to uncompress/unpack given files with the appropriate programs. If an URI
+starting with https, http or ftp is provided simple-extract tries to download
+and then uncompress/unpack the file. The choice is made along the filename
+ending. simple-extract will not delete the original archive (even on .gz,.bz2 or
+.xz) unless you use the '-d' option.
+
+: **sll()**
+Prints details of symlinks given as arguments.
+
+: **ssl-cert-fingerprints**
+Prints the SHA512, SHA256, SHA1 and MD5 digest of a x509 certificate.
+First and only parameter must be a file containing a certificate. Use
+/dev/stdin as file if you want to pipe a certificate to these
+functions.
+
+: **ssl-cert-info**
+Prints all information of a x509 certificate including the SHA512,
+SHA256, SHA1 and MD5 digests. First and only parameter must be a file
+containing a certificate. Use /dev/stdin as file if you want to pipe a
+certificate to this function.
+
+: **ssl-cert-sha512(), ssl-cert-sha256(), ssl-cert-sha1(), ssl-cert-md5()**
+Prints the SHA512, SHA256, SHA1 respective MD5 digest of a x509
+certificate. First and only parameter must be a file containing a
+certificate. Use /dev/stdin as file if you want to pipe a certificate
+to this function.
+
+: **Start(), Restart(), Stop(), Force-Reload(), Reload()**
+Functions for controlling daemons.
+```
+Example usage:
+% Restart ssh
+```
+
+: **trans()**
+Translates a word from german to english (-D) or vice versa (-E).
+
+: **uchange()**
+Shows upstreams changelog of a given package in $PAGER.
+
+: **uprint()**
+Works around the "print -l ${(u)foo}"-limitation on zsh older than 4.2.
+
+: **utf2iso()**
+Changes every occurrence of the string UTF-8 or utf-8 in environment
+variables to iso885915.
+
+: **vim()**
+Wrapper for vim(1). It tries to set the title and hands vim the environment
+variable VIM_OPTIONS on the command line. So the user may define command
+line options, she always wants, in her .zshrc.local.
+
+: **whatwhen()**
+Searches the history for a given pattern and lists the results by date.
+The first argument is the search pattern. The second and third ones are
+optional and denote a search range (default: -100).
+
+: **xcat()**
+Tries to cat(1) file(s) given as parameter(s). Always returns true.
+See also xunfunction() below.
+
+: **xsource()**
+Tries to source the file(s) given as parameter(s). Always returns true.
+See zshbuiltins(1) for a detailed description of the source command.
+See also xunfunction() below.
+
+: **xtrename()**
+Changes the title of xterm window from within screen(1). Run without
+arguments for details.
+
+: **xunfunction()**
+Removes the functions salias, xcat, xsource, xunfunction and zrcautoload.
+
+: **zrcautoload()**
+Wrapper around the autoload builtin. Loads the definitions of functions
+from the file given as argument. Searches $fpath for the file. See also
+xunfunction() above.
+
+: **zrclocal()**
+Sources /etc/zsh/zshrc.local and ${HOME}/.zshrc.local. These are the files
+where own modifications should go. See also zshbuiltins(1) for a description
+of the source command.
+
+
+== ALIASES ==
+//grmlzshrc// comes with a wide array of predefined aliases to ease the user's
+life. A few aliases (like those involving //grep// or //ls//) use the option
+//--color=auto// for colourizing output. That option is part of **GNU**
+implementations of these tools, and will only be used if such an implementation
+is detected.
+
+: **acp** (//apt-cache policy//)
+With no arguments prints out the priorities of each source. If a package name
+is given, it displays detailed information about the priority selection of the
+package.
+
+: **acs** (//apt-cache search//)
+Searches debian package lists for the regular expression provided as argument.
+The search includes package names and descriptions. Prints out name and short
+description of matching packages.
+
+: **acsh** (//apt-cache show//)
+Shows the package records for the packages provided as arguments.
+
+: **adg** (//apt-get dist-upgrade//)
+Performs an upgrade of all installed packages. Also tries to automatically
+handle changing dependencies with new versions of packages. As this may change
+the install status of (or even remove) installed packages, it is potentially
+dangerous to use dist-upgrade; invoked by sudo, if necessary.
+
+: **ag** (//apt-get upgrade//)
+Downloads and installs the newest versions of all packages currently installed
+on the system. Under no circumstances are currently installed packages removed,
+or packages not already installed retrieved and installed. New versions of
+currently installed packages that cannot be upgraded without changing the install
+status of another package will be left at their current version. An update must
+be performed first (see au below); run by sudo, if necessary.
+
+: **agi** (//apt-get install//)
+Downloads and installs or upgrades the packages given on the command line.
+If a hyphen is appended to the package name, the identified package will be
+removed if it is installed. Similarly a plus sign can be used to designate a
+package to install. This may be useful to override decisions made by apt-get's
+conflict resolution system.
+A specific version of a package can be selected for installation by following
+the package name with an equals and the version of the package to select. This
+will cause that version to be located and selected for install. Alternatively a
+specific distribution can be selected by following the package name with a slash
+and the version of the distribution or the Archive name (stable, testing, unstable).
+Gets invoked by sudo, if user id is not 0.
+
+: **ati** (//aptitude install//)
+Aptitude is a terminal-based package manager with a command line mode similar to
+apt-get (see agi above); invoked by sudo, if necessary.
+
+: **au** (//apt-get update//)
+Resynchronizes the package index files from their sources. The indexes of
+available packages are fetched from the location(s) specified in
+/etc/apt/sources.list. An update should always be performed before an
+upgrade or dist-upgrade; run by sudo, if necessary.
+
+: **da** (//du -sch//)
+Prints the summarized disk usage of the arguments as well as a grand total
+in human readable format.
+
+: **dbp** (//dpkg-buildpackage//)
+Builds binary or source packages from sources (See: dpkg-buildpackage(1)).
+
+: **debs-by-size** (//grep-status -FStatus -sInstalled-Size,Package -n "install ok installed" | paste -sd "  \n" | sort -rn//)
+Prints installed Packages sorted by size (descending).
+
+: **dir** (//ls -lSrah//)
+Lists files (including dot files) sorted by size (biggest last) in long and
+human readable output format.
+
+: **ge** (//grep-excuses//)
+Searches the testing excuses files for a specific maintainer (See:
+grep-excuses(1)).
+
+: **grep** (//grep --color=auto//)
+Shows grep output in nice colors, if available.
+
+: **grml-version** (//cat /etc/grml_version//)
+Prints version of running grml.
+
+: **hbp** (//hg-buildpackage//)
+Helper program to maintain Debian packages with mercurial.
+
+: **http** (//python -m SimpleHTTPServer//)
+Basic HTTP server implemented in python. Listens on port 8000/tcp and
+serves current directory. Implements GET and HEAD methods.
+
+: **insecscp** (//scp -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null"//)
+scp with possible man-in-the-middle attack enabled. This is convenient, if the targets
+host key changes frequently, for example on virtualized test- or development-systems.
+To be used only inside trusted networks, of course.
+
+: **insecssh** (//ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null"//)
+ssh with possible man-in-the-middle attack enabled
+(for an explanation see insecscp above).
+
+: **help-zshglob** (//H-Glob()//)
+Runs the function H-Glob() to expand or explain wildcards.
+
+: **j** (//jobs -l//)
+Prints status of jobs in the current shell session in long format.
+
+: **l** (//ls -l --color=auto//)
+Lists files in long output format with indicator for filetype appended
+to filename. If the terminal supports it, with colored output.
+
+: **la** (//ls -la --color=auto//)
+Lists files in long colored output format. Including file names
+starting with ".".
+
+: **lad** (//ls -d .*(/)//)
+Lists the dot directories (not their contents) in current directory.
+
+: **lh** (//ls -hAl --color=auto//)
+Lists files in long and human readable output format in nice colors,
+if available. Includes file names starting with "." except "." and
+"..".
+
+: **ll** (//ls -l --color=auto//)
+Lists files in long colored output format.
+
+: **llog** (//$PAGER /var/log/syslog//)
+Opens syslog in pager.
+
+: **ls** (//ls -C --color=auto//)
+Lists directory, entries are listed by columns and an indicator for
+file type is appended to each file name. Additionally the output is
+colored, if the terminal supports it.
+
+: **lsa** (//ls -a .*(.)//)
+Lists dot files in current working directory.
+
+: **lsbig** (//ls -flh *(.OL[1,10])//)
+Displays the ten biggest files (long and human readable output format).
+
+: **lsd** (//ls -d *(/)//)
+Shows directories.
+
+: **lse** (//ls -d *(/^F)//)
+Shows empty directories.
+
+: **lsl** (//ls -l *(@)//)
+Lists symbolic links in current directory.
+
+: **lsnew** (//ls -rl *(D.om[1,10])//)
+Displays the ten newest files (long output format).
+
+: **lsnewdir** (//ls -rthdl *(/om[1,10]) .*(D/om[1,10])//)
+Displays the ten newest directories and ten newest .directories.
+
+: **lsold** (//ls -rtlh *(D.om[1,10])//)
+Displays the ten oldest files (long output format).
+
+: **lsolddir** (//ls -rthdl *(/Om[1,10]) .*(D/Om[1,10])//)
+Displays the ten oldest directories and ten oldest .directories.
+
+: **lss** (//ls -l *(s,S,t)//)
+Lists files in current directory that have the setuid, setgid or sticky bit
+set.
+
+: **lssmall** (//ls -Srl *(.oL[1,10])//)
+Displays the ten smallest files (long output format).
+
+: **lsw** (//ls -ld *(R,W,X.^ND/)//)
+Displays all files which are world readable and/or world writable and/or
+world executable (long output format).
+
+: **lsx** (//ls -l *(*)//)
+Lists only executable files.
+
+: **mdstat** (//cat /proc/mdstat//)
+Lists all active md (i.e. linux software raid) devices with some information
+about them.
+
+: **mq** (//hg -R $(readlink -f $(hg root)/.hg/patches)//)
+Executes the commands on the versioned patch queue from current repository.
+
+: **rmcdir** (//'cd ..; rmdir $OLDPWD || cd $OLDPWD//)
+rmdir current working directory
+
+: **screen** (//screen -c file//)
+If invoking user is root, starts screen session with /etc/grml/screenrc
+as config file. If invoked by a regular user and users .screenc does not exist,
+starts screen with /etc/grml/screenrc_grml config if it exists, else fallbacks
+to /etc/grml/screenrc.
+
+: **su** (//sudo su//)
+If user is running a Grml live system, don't ask for any password, if she
+wants a root shell.
+
+: **term2iso** (//echo 'Setting terminal to iso mode' ; print -n '\e%@'//)
+Sets mode from UTF-8 to ISO 2022 (See:
+http://www.cl.cam.ac.uk/~mgk25/unicode.html#term).
+
+: **term2utf** (//echo 'Setting terminal to utf-8 mode'; print -n '\e%G'//)
+Sets mode from ISO 2022 to UTF-8 (See:
+http://www.cl.cam.ac.uk/~mgk25/unicode.html#term).
+
+: **tlog** (//tail -f /var/log/syslog//)
+Prints syslog continuously (See tail(1)).
+
+: **up** (//aptitude update ; aptitude safe-upgrade//)
+Performs a system update followed by a system upgrade using aptitude; run
+by sudo, if necessary. See au and ag above.
+
+: **url-quote** (//autoload -U url-quote-magic ; zle -N self-insert url-quote-magic//)
+After calling, characters of URLs as typed get automatically escaped, if necessary, to
+protect them from the shell.
+
+: **$(uname -r)-reboot** (//kexec -l --initrd=/boot/initrd.img-"$(uname -r)" --command-line=\"$(cat /proc/cmdline)\" /boot/vmlinuz-"$(uname -r)"//)
+Reboots using kexec(8) and thus reduces boot time by skipping hardware initialization of BIOS/firmware.
+
+: **...** (//cd ../..///)
+Changes current directory two levels higher.
+
+
+= AUXILIARY FILES =
+This is a set of files, that - if they exist - can be used to customize the
+behaviour of //grmlzshrc//.
+
+: **.zshrc.pre**
+Sourced at the very beginning of //grmlzshrc//. Among other things, it can
+be used to permantenly change //grmlzshrc//'s STARTUP VARIABLES (see above):
+\
+```
+# show battery status in RPROMPT
+GRML_DISPLAY_BATTERY=1
+# always load the complete setup, even for root
+GRML_ALWAYS_LOAD_ALL=1
+```
+
+: **.zshrc.local**
+Sourced right before loading //grmlzshrc// is finished. There is a global
+version of this file (/etc/zsh/zshrc.local) which is sourced before the
+user-specific one.
+
+: **.zdirs**
+Directory listing for persistent dirstack (see above).
+
+: **.important_commands**
+List of commands, used by persistent history (see above).
+
+
+= INSTALLATION ON NON-DEBIAN SYSTEMS =
+On Debian systems (http://www.debian.org) - and possibly Ubuntu
+(http://www.ubuntu.com) and similar systems - it is very easy to get
+//grmlzshrc// via grml's .deb repositories.
+
+On non-debian systems, that is not an option, but all is not lost:
+\
+```
+% wget -O .zshrc http://git.grml.org/f/grml-etc-core/etc/zsh/zshrc
+```
+
+If you would also like to get separate function files (which you can put into
+your **$fpath**), you can browse and download them at:
+
+http://git.grml.org/?p=grml-etc-core.git;a=tree;f=usr_share_grml/zsh;hb=HEAD
+
+= ZSH REFCARD TAGS =
+If you read //grmlzshrc//'s code you may notice strange looking comments in
+it. These are there for a purpose. grml's zsh-refcard is automatically
+generated from the contents of the actual configuration file. However, we need
+a little extra information on which comments and what lines of code to take
+into account (and for what purpose).
+
+Here is what they mean:
+
+List of tags (comment types) used:
+: **#a#**
+Next line contains an important alias, that should be included in the
+grml-zsh-refcard. (placement tag: @@INSERT-aliases@@)
+
+: **#f#**
+Next line contains the beginning of an important function. (placement
+tag: @@INSERT-functions@@)
+
+: **#v#**
+Next line contains an important variable. (placement tag:
+@@INSERT-variables@@)
+
+: **#k#**
+Next line contains an important keybinding. (placement tag:
+@@INSERT-keybindings@@)
+
+: **#d#**
+Hashed directories list generation: //start//: denotes the start of a list of
+'hash -d' definitions. //end//: denotes its end. (placement tag:
+@@INSERT-hasheddirs@@)
+
+: **#A#**
+Abbreviation expansion list generation: //start//: denotes the beginning of
+abbreviations. //end//: denotes their end.
+\
+Lines within this section that end in '#d .*' provide extra documentation to
+be included in the refcard. (placement tag: @@INSERT-abbrev@@)
+
+: **#m#**
+This tag allows you to manually generate refcard entries for code lines that
+are hard/impossible to parse.
+Example:
+\
+```
+#m# k ESC-h Call the run-help function
+```
+\
+That would add a refcard entry in the keybindings table for 'ESC-h' with the
+given comment.
+\
+So the syntax is: #m# <section> <argument> <comment>
+
+: **#o#**
+This tag lets you insert entries to the 'other' hash. Generally, this should
+not be used. It is there for things that cannot be done easily in another way.
+(placement tag: @@INSERT-other-foobar@@)
+
+
+All of these tags (except for m and o) take two arguments, the first
+within the tag, the other after the tag:
+
+#<tag><section># <comment>
+
+Where <section> is really just a number, which are defined by the @secmap
+array on top of 'genrefcard.pl'. The reason for numbers instead of names is,
+that for the reader, the tag should not differ much from a regular comment.
+For zsh, it is a regular comment indeed. The numbers have got the following
+meanings:
+
+: **0**
+//default//
+
+: **1**
+//system//
+
+: **2**
+//user//
+
+: **3**
+//debian//
+
+: **4**
+//search//
+
+: **5**
+//shortcuts//
+
+: **6**
+//services//
+
+
+So, the following will add an entry to the 'functions' table in the 'system'
+section, with a (hopefully) descriptive comment:
+\
+```
+#f1# Edit an alias via zle
+edalias() {
+```
+\
+It will then show up in the @@INSERT-aliases-system@@ replacement tag that can
+be found in 'grml-zsh-refcard.tex.in'. If the section number is omitted, the
+'default' section is assumed. Furthermore, in 'grml-zsh-refcard.tex.in'
+@@INSERT-aliases@@ is exactly the same as @@INSERT-aliases-default@@. If you
+want a list of **all** aliases, for example, use @@INSERT-aliases-all@@.
+
+
+= CONTRIBUTING =
+If you want to help to improve grml's zsh setup, clone the grml-etc-core
+repository from git.grml.org:
+\
+``` % git clone git://git.grml.org/grml-etc-core.git
+
+Make your changes, commit them; use '**git format-patch**' to create a series
+of patches and send those to the following address via '**git send-email**':
+\
+``` grml-etc-core@grml.org
+
+Doing so makes sure the right people get your patches for review and
+possibly inclusion.
+
+
+= STATUS =
+This manual page is the **reference** manual for //grmlzshrc//.
+
+That means that in contrast to the existing refcard it should document **every**
+aspect of the setup.
+
+This manual is currently not complete. If you want to help improving it, visit
+the following pages:
+
+http://wiki.grml.org/doku.php?id=zshrcmanual
+
+http://lists.mur.at/pipermail/grml/2009-August/004609.html
+
+Contributions are highly welcome.
+
+
+= AUTHORS =
+This manpage was written by Frank Terbeck <ft@grml.org>, Joerg Woelke
+<joewoe@fsmail.de>, Maurice McCarthy <manselton@googlemail.com> and Axel
+Beckert <abe@deuxchevaux.org>.
+
+
+= COPYRIGHT =
+Copyright (c) 2009-2013 Grml project <http://grml.org>
+
+This manpage is distributed under the terms of the GPL version 2.
+
+Most parts of grml's zshrc are distributed under the terms of GPL v2, too,
+except for **accept-line()** which are distributed under the same conditions
+as zsh itself (which is BSD-like).
