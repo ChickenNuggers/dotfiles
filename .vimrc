@@ -37,7 +37,6 @@ let g:netrw_liststyle = 3
 let g:netrw_sort_sequence = '[\/]$,*'
 autocmd vimenter * Lexplore | wincmd l | TagbarToggle
 autocmd bufenter * if (winnr("$") == 2 && (&ft ==# "netrw" || &ft ==# "tagbar")) | qa | endif
-autocmd bufenter * silent exec "!ctags -R ."
 
 let g:easytags_async = 1
 
@@ -72,7 +71,7 @@ execute pathogen#infect()
 filetype plugin indent on
 
 " show invisibles
-set listchars=tab:▸\ ,eol:¬ " shows whitespac
+set listchars=tab:▸\ ,eol:¬ " shows whitespace
 nmap <leader>l :set list!<CR>
 set list " shows whitespace via chars
 
