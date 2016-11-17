@@ -23,31 +23,6 @@ set notimeout ttimeout ttimeoutlen=200  " timeout after .2 seconds on key combos
 set clipboard^=unnamedplus              " set clipboard to yank to system clipboard
 set pastetoggle=<Leader>p               " toggle paste! via this key
 
-let g:AutoPairs = {'(':')', '[':']', '{':'}',"'":"'",'"':'"', '`':'`', '<': '>'}
-let g:jellybeans_overrides = { 'VertSplit': { 'guifg': '262626', 'guibg': '262626', 'attr': '', 'ctermfg': '235', 'ctermbg': '235' }, 'background': {'guibg': 'none'} }
-let g:lightline = {'colorscheme': 'gruvbox'}
-
-" absolute width of netrw window
-let g:netrw_winsize = -28
-" do not display info on the top of window
-let g:netrw_banner = 0
-" tree-view
-let g:netrw_liststyle = 3
-" sort is affecting only: directories on the top, files below
-let g:netrw_sort_sequence = '[\/]$,*'
-autocmd vimenter * Lexplore | wincmd l | TagbarToggle
-autocmd bufenter * if (winnr("$") == 2 && (&ft ==# "netrw" || &ft ==# "tagbar")) | qa | endif
-
-let g:easytags_async = 1
-
-let g:ctrlp_map = ',p'
-
-let g:vcm_default_maps = 0
-
-let g:UltiSnipsExpandTrigger=",,"
-let g:UltiSnipsJumpForwardTrigger="nn"
-let g:UltiSnipsJumpBackwardTrigger="pp"
-
 nnoremap Y y$
 nnoremap <C-L> :nohl<CR>
 nnoremap <C-S> :w<CR>
@@ -65,34 +40,48 @@ inoremap ,k <C-O>dd
 imap ,n <Plug>vim_completes_me_forward
 imap ,p <Plug>vim_completes_me_backward
 
+let g:AutoPairs = {'(':')', '[':']', '{':'}',"'":"'",'"':'"', '`':'`', '<': '>'}
+let g:lightline = {'colorscheme': 'gruvbox'}
+
+let g:netrw_winsize = -28
+let g:netrw_banner = 0
+let g:netrw_liststyle = 3
+let g:netrw_sort_sequence = '[\/]$,*'
+
+autocmd vimenter * Lexplore | wincmd l | TagbarToggle
+autocmd bufenter * if (winnr("$") == 2 && (&ft ==# "netrw" || &ft ==# "tagbar")) | qa | endif
+
+let g:easytags_async = 1
+
+let g:ctrlp_map = ',p'
+
+let g:vcm_default_maps = 0 " see imap ,n | ,p
+
+let g:UltiSnipsExpandTrigger=",,"
+let g:UltiSnipsJumpForwardTrigger="nn"
+let g:UltiSnipsJumpBackwardTrigger="pp"
+
 filetype off
 runtime bundle/vim-pathogen/autoload/pathogen.vim
 execute pathogen#infect()
 filetype plugin indent on
 
-" show invisibles
-set listchars=tab:▸\ ,eol:¬ " shows whitespace
+set listchars=tab:▸\ ,eol:¬
 nmap <leader>l :set list!<CR>
-set list " shows whitespace via chars
+set list
 
-" Syntax highlighting
 set background=dark
 colorscheme gruvbox
 
 hi Normal ctermbg=none
 
-" If you want :UltiSnipsEdit to split your window.
 let g:UltiSnipsEditSplit="vertical"
-
-" UltiSnips filetype automatic
 autocmd FileType * exec 'UltiSnipsAddFiletypes ' . expand('<amatch>')
 
 augroup filetype_lua
 	autocmd!
 	autocmd FileType lua setlocal iskeyword+=.
+	autocmd FileType lua setlocal iskeyword+=:
 augroup END
-
-" NERDTree tree
-autocmd StdinReadPre * let s:std_in=1
 
 set exrc secure " per-project RC files
