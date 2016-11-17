@@ -2,7 +2,7 @@ syntax on
 
 set hidden                              " don't nuke buffer when not displayed
 set wildmenu                            " wildcard menu displayed when tab completing
-set path+=**                            " glob current directory into path
+set path=.,**                           " glob current directory into path
 set showcmd                             " show the current command being typed in
 set hlsearch                            " turn on highlighting when searching via /
 set ignorecase                          " ignore the case when searching
@@ -21,7 +21,7 @@ set cursorcolumn cursorline             " crosshairs for cursor
 set modeline                            " allows support for modeline (vim:set noet sts=0 sw=8 ts=0 tw=8:)
 set notimeout ttimeout ttimeoutlen=200  " timeout after .2 seconds on key combos
 set clipboard^=unnamedplus              " set clipboard to yank to system clipboard
-set pastetoggle=<F11>                   " toggle paste! via this key
+set pastetoggle=<Leader>p               " toggle paste! via this key
 
 let g:AutoPairs = {'(':')', '[':']', '{':'}',"'":"'",'"':'"', '`':'`', '<': '>'}
 let g:jellybeans_overrides = { 'VertSplit': { 'guifg': '262626', 'guibg': '262626', 'attr': '', 'ctermfg': '235', 'ctermbg': '235' }, 'background': {'guibg': 'none'} }
@@ -94,3 +94,5 @@ augroup END
 
 " NERDTree tree
 autocmd StdinReadPre * let s:std_in=1
+
+set exrc secure " per-project RC files
